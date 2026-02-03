@@ -1,0 +1,269 @@
+// Prisma schema for Bail Forms App
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Admin users for BondProspects management
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("admin")  // admin, superadmin
+  isActive     Boolean  @default(true)
+  
+  lastLoginAt  DateTime?
+  lastLoginIp  String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  slug      String   @unique  // URL slug: "abetterbailbonds", "quickbail"
+  name      String
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  phone     String?
+  email     String?
+  logo      String?  // URL to logo image
+  primaryColor String? // Brand color for customization
+  isActive  Boolean  @default(true)
+  
+  // Form template identifier - matches file name or template ID
+  formTemplateId String?  // e.g., "abetterbailbonds", "quickrelease", "default"
+  
+  // Bailbooks integration
+  bailbooksCompanyId Int?     @unique  // Link to Bailbooks Companies.CompanyID
+  
+  // API Key for Bailbooks to call BondProspects (future webhook)
+  apiKey           String?   @unique  // API key for this company
+  apiKeyCreatedAt  DateTime?
+  apiKeyLastUsedAt DateTime?
+  
+  // Last sync timestamp for Bailbooks data
+  lastSyncedAt     DateTime?
+  
+  intakes   Intake[]
+  agents    Agent[]
+  apiLogs   ApiLog[]
+  formTemplates FormTemplate[]
+  syncedAgents    SyncedAgent[]
+  syncedFacilities SyncedFacility[]
+  syncedCourts    SyncedCourt[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Synced Agents from Bailbooks (nightly sync)
+model SyncedAgent {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  bailbooksAgentId Int      // Bailbooks Agents.AgentID
+  name            String
+  isActive        Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([companyId, bailbooksAgentId])
+  @@index([companyId])
+}
+
+// Synced Posting Facilities from Bailbooks (nightly sync)
+model SyncedFacility {
+  id                  String   @id @default(cuid())
+  companyId           String
+  company             Company  @relation(fields: [companyId], references: [id])
+  
+  bailbooksFacilityId Int      // Bailbooks Facilities.FacilityID
+  name                String
+  facilityType        String?  // "jail", "court", etc.
+  isActive            Boolean  @default(true)
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  @@unique([companyId, bailbooksFacilityId])
+  @@index([companyId])
+}
+
+// Synced Courts from Bailbooks (nightly sync)
+model SyncedCourt {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  
+  bailbooksCourtId Int      // Bailbooks Courts or Facilities ID
+  name            String
+  isActive        Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([companyId, bailbooksCourtId])
+  @@index([companyId])
+}
+
+// Track API usage
+model ApiLog {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  
+  endpoint  String
+  method    String
+  status    Int
+  ipAddress String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+model Agent {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  
+  name      String
+  email     String   @unique
+  phone     String?
+  
+  // Authentication (future)
+  passwordHash String?
+  
+  intakes   Intake[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Intake {
+  id        String   @id @default(cuid())
+  
+  // Unique link code for customer access (e.g., "x7k9m2")
+  linkCode  String   @unique
+  
+  // Company and agent who created the link
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  agentId   String?
+  agent     Agent?   @relation(fields: [agentId], references: [id])
+  
+  // Status tracking
+  status    IntakeStatus @default(PENDING)
+  
+  // Source of the intake
+  source    IntakeSource @default(CLIENT)  // CLIENT = client-initiated, AGENT = agent-initiated from Bailbooks
+  
+  // Form data stored as JSON
+  defendantData   Json?   // Defendant information
+  indemnitorData  Json?   // Indemnitor/co-signer information
+  referencesData  Json?   // Array of references
+  bondData        Json?   // Single bond (legacy) or primary bond info
+  
+  // Multiple bonds support (agent-initiated)
+  bondsData       Json?   // Array of bonds: [{amount, premium, court, charges, caseNumber}, ...]
+  sharedBondData  Json?   // Shared across all bonds: {bondDate, postingFacility, agentName}
+  
+  // Signatures stored as base64 PNG
+  signatures      Json?   // { defendant: "base64...", indemnitor: "base64...", waiver: "base64..." }
+  
+  // Submission tracking
+  submittedAt     DateTime?
+  submitterIp     String?
+  submitterUserAgent String?
+  
+  // Generated PDF URLs (stored in S3/R2 or as base64)
+  generatedPdfs   Json?   // { preApplication: "url", indemnitorApp: "url", ... }
+  
+  // Request delivery tracking (for agent-initiated)
+  deliveryMethod  String?   // "email" or "sms"
+  requestSentAt   DateTime?
+  requestSentTo   String?   // email address or phone number
+  requestOpenedAt DateTime? // when co-signer first opened the link
+  
+  // Email tracking (legacy - for completion emails)
+  emailSentAt     DateTime?
+  emailSentTo     String?
+  
+  // Bailbooks sync
+  bailbooksSynced   Boolean  @default(false)
+  bailbooksSyncedAt DateTime?
+  bailbooksCustomerId Int?
+  
+  // Link expiration
+  expiresAt DateTime
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([linkCode])
+  @@index([companyId])
+  @@index([status])
+  @@index([source])
+}
+
+enum IntakeStatus {
+  PENDING     // Link created, waiting for customer
+  IN_PROGRESS // Customer started filling out
+  COMPLETED   // Customer submitted
+  EXPIRED     // Link expired
+  CANCELLED   // Agent cancelled
+}
+
+enum IntakeSource {
+  CLIENT      // Client started from company website
+  AGENT       // Agent initiated from Bailbooks
+}
+
+// Audit log for compliance
+model AuditLog {
+  id        String   @id @default(cuid())
+  intakeId  String
+  action    String   // "created", "viewed", "submitted", "pdf_generated", "email_sent"
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  
+  @@index([intakeId])
+}
+
+// Form templates stored per company
+model FormTemplate {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  
+  // Form identification
+  formType  String   // "preApplication", "referenceForm", "immigrationWaiver", "indemnitorApplication", "immigrationBondAgreement"
+  name      String   // Display name: "Pre-Application"
+  
+  // The actual HTML template with placeholders
+  htmlTemplate String @db.Text
+  
+  // Form configuration
+  requiredSignatures Json?  // Array of signature configs: [{id: "coSigner", label: "Co-Signer", required: true}]
+  isActive  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([companyId, formType])
+  @@index([companyId])
+}

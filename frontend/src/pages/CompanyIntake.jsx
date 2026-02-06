@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm, FormProvider } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
 
 import StepIndicator from '../components/FormWizard/StepIndicator'
-import { intakeSchema } from '../utils/validation'
+import { buildDynamicSchema, getRequiredFieldPaths } from '../utils/validation'
+import { RequiredFieldsProvider } from '../contexts/RequiredFieldsContext'
 import StepBasicInfo from '../components/FormWizard/StepBasicInfo'
 import StepDefendant from '../components/FormWizard/StepDefendant'
 import StepIndemnitor from '../components/FormWizard/StepIndemnitor'
@@ -57,17 +58,29 @@ const getStepsForWizardType = (wizardType) => {
 export default function CompanyIntake() {
   const { companySlug } = useParams()
   const navigate = useNavigate()
-  
+
   const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [company, setCompany] = useState(null)
   const [intake, setIntake] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  
+
+  // Build dynamic schema based on company's requiredFields configuration
+  const dynamicSchema = useMemo(() => {
+    const requiredFields = getRequiredFieldPaths(company)
+    const wizardType = company?.wizardType?.toLowerCase() || 'medium'
+    return buildDynamicSchema(requiredFields, wizardType)
+  }, [company])
+
+  // Get required field paths for marking fields in UI
+  const requiredFieldPaths = useMemo(() => {
+    return new Set(getRequiredFieldPaths(company))
+  }, [company])
+
   const methods = useForm({
     mode: 'onChange',
-    resolver: zodResolver(intakeSchema),
+    resolver: zodResolver(dynamicSchema),
     defaultValues: {
       defendant: {
         firstName: '',
@@ -113,8 +126,15 @@ export default function CompanyIntake() {
     }
   })
   
-  const { handleSubmit, trigger, getValues } = methods
-  
+  const { handleSubmit, trigger, getValues, clearErrors } = methods
+
+  // Clear errors when schema changes (company loads) to re-evaluate with new schema
+  useEffect(() => {
+    if (company) {
+      clearErrors()
+    }
+  }, [company, clearErrors])
+
   // Load company and create intake session on mount
   useEffect(() => {
     async function loadCompany() {
@@ -240,8 +260,9 @@ export default function CompanyIntake() {
   const brandColor = company?.primaryColor || '#2563eb'
   
   return (
-    <FormProvider {...methods}>
-      <div className="min-h-screen pb-24">
+    <RequiredFieldsProvider requiredFields={requiredFieldPaths}>
+      <FormProvider {...methods}>
+        <div className="min-h-screen pb-24">
         {/* Header with company branding */}
         <header 
           className="border-b border-gray-200 sticky top-0 z-10"
@@ -358,7 +379,8 @@ export default function CompanyIntake() {
           </div>
         )}
       </div>
-    </FormProvider>
+      </FormProvider>
+    </RequiredFieldsProvider>
   )
 }
 

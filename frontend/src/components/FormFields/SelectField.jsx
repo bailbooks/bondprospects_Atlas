@@ -1,6 +1,7 @@
 import { forwardRef } from 'react'
 import { useFormContext } from 'react-hook-form'
 import clsx from 'clsx'
+import { useIsFieldRequired } from '../../contexts/RequiredFieldsContext'
 
 // Get nested error from errors object using dot notation path
 const getNestedError = (errors, path) => {
@@ -15,13 +16,17 @@ const getNestedError = (errors, path) => {
 }
 
 const SelectField = forwardRef(function SelectField(
-  { label, name, options, required, error: propError, placeholder = 'Select...', className, ...props },
+  { label, name, options, required: requiredProp, error: propError, placeholder = 'Select...', className, ...props },
   ref
 ) {
   // Get errors from form context if not explicitly provided
   const formContext = useFormContext()
   const contextError = formContext ? getNestedError(formContext.formState.errors, name) : null
   const error = propError || contextError
+
+  // Check if field is required from context if not explicitly set
+  const isContextRequired = useIsFieldRequired(name)
+  const required = requiredProp !== undefined ? requiredProp : isContextRequired
 
   return (
     <div className={className}>

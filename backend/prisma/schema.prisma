@@ -41,6 +41,9 @@ model Company {
   
   // Form template identifier - matches file name or template ID
   formTemplateId String?  // e.g., "abetterbailbonds", "quickrelease", "default"
+
+  // Wizard type determines which form steps are shown to clients
+  wizardType     String   @default("medium")  // "basic", "medium", "full"
   
   // Bailbooks integration
   bailbooksCompanyId Int?     @unique  // Link to Bailbooks Companies.CompanyID

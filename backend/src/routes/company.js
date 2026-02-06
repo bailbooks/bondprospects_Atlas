@@ -15,7 +15,7 @@ router.get('/:slug', async (req, res, next) => {
     
     // Find company by slug (case-insensitive)
     const company = await prisma.company.findFirst({
-      where: { 
+      where: {
         slug: {
           equals: slug.toLowerCase(),
           mode: 'insensitive'
@@ -32,7 +32,8 @@ router.get('/:slug', async (req, res, next) => {
         phone: true,
         email: true,
         logo: true,
-        primaryColor: true
+        primaryColor: true,
+        wizardType: true
       }
     });
     

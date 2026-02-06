@@ -14,7 +14,15 @@ import StepReview from '../components/FormWizard/StepReview'
 import StepSignatures from '../components/FormWizard/StepSignatures'
 import LoadingSpinner from '../components/LoadingSpinner'
 
-const STEPS = [
+// Basic Wizard - Quick form with essential info only
+const BASIC_STEPS = [
+  { id: 'basic', title: 'Basic Info', component: StepBasicInfo },
+  { id: 'review', title: 'Review', component: StepReview },
+  { id: 'signatures', title: 'Sign', component: StepSignatures },
+]
+
+// Medium Wizard - Standard form (default)
+const MEDIUM_STEPS = [
   { id: 'basic', title: 'Basic Info', component: StepBasicInfo },
   { id: 'defendant', title: 'Defendant', component: StepDefendant },
   { id: 'indemnitor', title: 'Indemnitor', component: StepIndemnitor },
@@ -22,6 +30,29 @@ const STEPS = [
   { id: 'review', title: 'Review', component: StepReview },
   { id: 'signatures', title: 'Sign', component: StepSignatures },
 ]
+
+// Full Wizard - Comprehensive form with all details
+const FULL_STEPS = [
+  { id: 'basic', title: 'Basic Info', component: StepBasicInfo },
+  { id: 'defendant', title: 'Defendant', component: StepDefendant },
+  { id: 'indemnitor', title: 'Indemnitor', component: StepIndemnitor },
+  { id: 'references', title: 'References', component: StepReferences },
+  { id: 'review', title: 'Review', component: StepReview },
+  { id: 'signatures', title: 'Sign', component: StepSignatures },
+]
+
+// Get steps based on wizard type
+const getStepsForWizardType = (wizardType) => {
+  switch (wizardType) {
+    case 'basic':
+      return BASIC_STEPS
+    case 'full':
+      return FULL_STEPS
+    case 'medium':
+    default:
+      return MEDIUM_STEPS
+  }
+}
 
 export default function CompanyIntake() {
   const { companySlug } = useParams()
@@ -137,12 +168,16 @@ export default function CompanyIntake() {
     return () => clearTimeout(timer)
   }, [currentStep, intake, getValues])
   
+  // Get steps based on company's wizard type (for early validation)
+  const wizardSteps = getStepsForWizardType(company?.wizardType)
+
   const handleNext = async () => {
-    const stepFields = getStepFields(currentStep)
+    const stepId = wizardSteps[currentStep]?.id
+    const stepFields = getStepFieldsById(stepId)
     const isValid = await trigger(stepFields)
-    
+
     if (isValid) {
-      setCurrentStep(prev => Math.min(prev + 1, STEPS.length - 1))
+      setCurrentStep(prev => Math.min(prev + 1, wizardSteps.length - 1))
       window.scrollTo(0, 0)
     }
   }
@@ -196,8 +231,10 @@ export default function CompanyIntake() {
     )
   }
   
-  const CurrentStepComponent = STEPS[currentStep].component
-  const isLastStep = currentStep === STEPS.length - 1
+  // Get steps based on company's wizard type
+  const steps = getStepsForWizardType(company?.wizardType)
+  const CurrentStepComponent = steps[currentStep].component
+  const isLastStep = currentStep === steps.length - 1
   
   // Dynamic branding based on company
   const brandColor = company?.primaryColor || '#2563eb'
@@ -231,7 +268,7 @@ export default function CompanyIntake() {
                   {company?.name || 'Bail Bond Application'}
                 </h1>
                 <p className="text-sm text-gray-500">
-                  Step {currentStep + 1} of {STEPS.length}: {STEPS[currentStep].title}
+                  Step {currentStep + 1} of {steps.length}: {steps[currentStep].title}
                 </p>
               </div>
             </div>
@@ -239,10 +276,10 @@ export default function CompanyIntake() {
           
           {/* Progress bar */}
           <div className="h-2 bg-gray-200">
-            <div 
+            <div
               className="h-full transition-all duration-300"
-              style={{ 
-                width: `${((currentStep + 1) / STEPS.length) * 100}%`,
+              style={{
+                width: `${((currentStep + 1) / steps.length) * 100}%`,
                 backgroundColor: brandColor
               }}
             />
@@ -251,7 +288,7 @@ export default function CompanyIntake() {
         
         {/* Step indicators */}
         <div className="max-w-2xl mx-auto px-4 py-4">
-          <StepIndicator steps={STEPS} currentStep={currentStep} />
+          <StepIndicator steps={steps} currentStep={currentStep} />
         </div>
         
         {/* Error message */}
@@ -325,21 +362,22 @@ export default function CompanyIntake() {
   )
 }
 
-function getStepFields(stepIndex) {
-  switch (stepIndex) {
-    case 0:
-      return ['defendant.firstName', 'defendant.lastName', 'defendant.dob', 
+// Get fields to validate for each step by step ID
+function getStepFieldsById(stepId) {
+  switch (stepId) {
+    case 'basic':
+      return ['defendant.firstName', 'defendant.lastName', 'defendant.dob',
               'indemnitor.firstName', 'indemnitor.lastName', 'indemnitor.relationshipToDefendant']
-    case 1:
+    case 'defendant':
       return ['defendant']
-    case 2:
+    case 'indemnitor':
       return ['indemnitor']
-    case 3:
+    case 'references':
       return ['references']
-    case 4:
+    case 'review':
       return []
-    case 5:
-      return ['signatures.indemnitor']
+    case 'signatures':
+      return ['signatures']
     default:
       return []
   }

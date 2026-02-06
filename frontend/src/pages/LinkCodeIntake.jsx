@@ -8,9 +8,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm, FormProvider } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
 
 import StepIndicator from '../components/FormWizard/StepIndicator'
+import { intakeSchema } from '../utils/validation'
 import StepBasicInfo from '../components/FormWizard/StepBasicInfo'
 import StepDefendant from '../components/FormWizard/StepDefendant'
 import StepIndemnitor from '../components/FormWizard/StepIndemnitor'
@@ -52,6 +54,7 @@ export default function LinkCodeIntake() {
   
   const methods = useForm({
     mode: 'onChange',
+    resolver: zodResolver(intakeSchema),
     defaultValues: {
       defendant: {},
       indemnitor: {},
@@ -61,8 +64,42 @@ export default function LinkCodeIntake() {
       finalAgreement: false,
     },
   })
-  
-  const { handleSubmit, reset, formState } = methods
+
+  const { handleSubmit, reset, formState, trigger } = methods
+
+  // Get field names to validate for each step
+  const getStepFields = (stepIndex, isAgent) => {
+    const steps = isAgent ? AGENT_STEPS : CLIENT_STEPS
+    const stepId = steps[stepIndex]?.id
+
+    switch (stepId) {
+      case 'basic':
+        return ['defendant.firstName', 'defendant.lastName', 'defendant.dob',
+                'indemnitor.firstName', 'indemnitor.lastName', 'indemnitor.relationshipToDefendant']
+      case 'defendant':
+        return ['defendant']
+      case 'indemnitor':
+        return ['indemnitor']
+      case 'references':
+        return ['references']
+      case 'review':
+        return []
+      case 'signatures':
+        return ['signatures']
+      default:
+        return []
+    }
+  }
+
+  const handleNext = async () => {
+    const stepFields = getStepFields(currentStep, isAgentInitiated)
+    const isValid = await trigger(stepFields)
+
+    if (isValid) {
+      setCurrentStep(currentStep + 1)
+      window.scrollTo(0, 0)
+    }
+  }
 
   useEffect(() => {
     const loadIntake = async () => {
@@ -364,10 +401,7 @@ export default function LinkCodeIntake() {
               {!isLastStep ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    setCurrentStep(currentStep + 1)
-                    window.scrollTo(0, 0)
-                  }}
+                  onClick={handleNext}
                   className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700"
                 >
                   Continue

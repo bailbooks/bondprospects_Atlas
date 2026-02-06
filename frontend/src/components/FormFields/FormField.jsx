@@ -1,5 +1,18 @@
-import { forwardRef, useState, useCallback } from 'react'
+import { forwardRef, useCallback } from 'react'
+import { useFormContext } from 'react-hook-form'
 import clsx from 'clsx'
+
+// Get nested error from errors object using dot notation path
+const getNestedError = (errors, path) => {
+  if (!path || !errors) return null
+  const parts = path.split('.')
+  let current = errors
+  for (const part of parts) {
+    if (!current) return null
+    current = current[part]
+  }
+  return current
+}
 
 // Format phone number as user types
 const formatPhoneNumber = (input) => {
@@ -16,9 +29,14 @@ const formatPhoneNumber = (input) => {
 }
 
 const FormField = forwardRef(function FormField(
-  { label, name, type = 'text', required, error, hint, className, onChange, ...props },
+  { label, name, type = 'text', required, error: propError, hint, className, onChange, ...props },
   ref
 ) {
+  // Get errors from form context if not explicitly provided
+  const formContext = useFormContext()
+  const contextError = formContext ? getNestedError(formContext.formState.errors, name) : null
+  const error = propError || contextError
+
   const isPhone = type === 'tel'
   
   const handleChange = useCallback((e) => {

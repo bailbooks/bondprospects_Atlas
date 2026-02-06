@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm, FormProvider } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
 
 import StepIndicator from '../components/FormWizard/StepIndicator'
+import { intakeSchema } from '../utils/validation'
 import StepBasicInfo from '../components/FormWizard/StepBasicInfo'
 import StepDefendant from '../components/FormWizard/StepDefendant'
 import StepIndemnitor from '../components/FormWizard/StepIndemnitor'
@@ -34,6 +36,7 @@ export default function CompanyIntake() {
   
   const methods = useForm({
     mode: 'onChange',
+    resolver: zodResolver(intakeSchema),
     defaultValues: {
       defendant: {
         firstName: '',

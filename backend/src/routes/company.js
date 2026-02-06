@@ -33,7 +33,8 @@ router.get('/:slug', async (req, res, next) => {
         email: true,
         logo: true,
         primaryColor: true,
-        wizardType: true
+        wizardType: true,
+        requiredFields: true
       }
     });
     

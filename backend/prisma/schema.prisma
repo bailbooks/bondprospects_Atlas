@@ -44,6 +44,10 @@ model Company {
 
   // Wizard type determines which form steps are shown to clients
   wizardType     String   @default("medium")  // "basic", "medium", "full"
+
+  // Required fields configuration per wizard type (JSON)
+  // Structure: { "medium": ["defendant.firstName", "defendant.lastName", ...], "basic": [...] }
+  requiredFields Json?
   
   // Bailbooks integration
   bailbooksCompanyId Int?     @unique  // Link to Bailbooks Companies.CompanyID

@@ -314,7 +314,8 @@ router.post('/companies', authenticateAdmin, async (req, res, next) => {
       logo,
       primaryColor,
       bailbooksCompanyId,
-      wizardType
+      wizardType,
+      requiredFields
     } = req.body;
     
     if (!slug || !name) {
@@ -383,6 +384,7 @@ router.post('/companies', authenticateAdmin, async (req, res, next) => {
         primaryColor,
         bailbooksCompanyId: bailbooksCompanyId ? parseInt(bailbooksCompanyId) : null,
         wizardType: wizardType || 'medium',
+        requiredFields: requiredFields || null,
         isActive: true
       }
     });
@@ -417,6 +419,7 @@ router.put('/companies/:id', authenticateAdmin, async (req, res, next) => {
       primaryColor,
       bailbooksCompanyId,
       wizardType,
+      requiredFields,
       isActive
     } = req.body;
     
@@ -478,6 +481,7 @@ router.put('/companies/:id', authenticateAdmin, async (req, res, next) => {
         primaryColor,
         bailbooksCompanyId: bailbooksCompanyId ? parseInt(bailbooksCompanyId) : null,
         wizardType,
+        requiredFields,
         isActive
       }
     });

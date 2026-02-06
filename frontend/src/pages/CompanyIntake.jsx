@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm, FormProvider } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
 
 import StepIndicator from '../components/FormWizard/StepIndicator'
+import { buildDynamicSchema, getRequiredFieldPaths } from '../utils/validation'
+import { RequiredFieldsProvider } from '../contexts/RequiredFieldsContext'
 import StepBasicInfo from '../components/FormWizard/StepBasicInfo'
 import StepDefendant from '../components/FormWizard/StepDefendant'
 import StepIndemnitor from '../components/FormWizard/StepIndemnitor'
@@ -12,7 +15,15 @@ import StepReview from '../components/FormWizard/StepReview'
 import StepSignatures from '../components/FormWizard/StepSignatures'
 import LoadingSpinner from '../components/LoadingSpinner'
 
-const STEPS = [
+// Basic Wizard - Quick form with essential info only
+const BASIC_STEPS = [
+  { id: 'basic', title: 'Basic Info', component: StepBasicInfo },
+  { id: 'review', title: 'Review', component: StepReview },
+  { id: 'signatures', title: 'Sign', component: StepSignatures },
+]
+
+// Medium Wizard - Standard form (default)
+const MEDIUM_STEPS = [
   { id: 'basic', title: 'Basic Info', component: StepBasicInfo },
   { id: 'defendant', title: 'Defendant', component: StepDefendant },
   { id: 'indemnitor', title: 'Indemnitor', component: StepIndemnitor },
@@ -21,19 +32,55 @@ const STEPS = [
   { id: 'signatures', title: 'Sign', component: StepSignatures },
 ]
 
+// Full Wizard - Comprehensive form with all details
+const FULL_STEPS = [
+  { id: 'basic', title: 'Basic Info', component: StepBasicInfo },
+  { id: 'defendant', title: 'Defendant', component: StepDefendant },
+  { id: 'indemnitor', title: 'Indemnitor', component: StepIndemnitor },
+  { id: 'references', title: 'References', component: StepReferences },
+  { id: 'review', title: 'Review', component: StepReview },
+  { id: 'signatures', title: 'Sign', component: StepSignatures },
+]
+
+// Get steps based on wizard type
+const getStepsForWizardType = (wizardType) => {
+  switch (wizardType) {
+    case 'basic':
+      return BASIC_STEPS
+    case 'full':
+      return FULL_STEPS
+    case 'medium':
+    default:
+      return MEDIUM_STEPS
+  }
+}
+
 export default function CompanyIntake() {
   const { companySlug } = useParams()
   const navigate = useNavigate()
-  
+
   const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [company, setCompany] = useState(null)
   const [intake, setIntake] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  
+
+  // Build dynamic schema based on company's requiredFields configuration
+  const dynamicSchema = useMemo(() => {
+    const requiredFields = getRequiredFieldPaths(company)
+    const wizardType = company?.wizardType?.toLowerCase() || 'medium'
+    return buildDynamicSchema(requiredFields, wizardType)
+  }, [company])
+
+  // Get required field paths for marking fields in UI
+  const requiredFieldPaths = useMemo(() => {
+    return new Set(getRequiredFieldPaths(company))
+  }, [company])
+
   const methods = useForm({
     mode: 'onChange',
+    resolver: zodResolver(dynamicSchema),
     defaultValues: {
       defendant: {
         firstName: '',
@@ -79,8 +126,15 @@ export default function CompanyIntake() {
     }
   })
   
-  const { handleSubmit, trigger, getValues } = methods
-  
+  const { handleSubmit, trigger, getValues, clearErrors } = methods
+
+  // Clear errors when schema changes (company loads) to re-evaluate with new schema
+  useEffect(() => {
+    if (company) {
+      clearErrors()
+    }
+  }, [company, clearErrors])
+
   // Load company and create intake session on mount
   useEffect(() => {
     async function loadCompany() {
@@ -134,12 +188,16 @@ export default function CompanyIntake() {
     return () => clearTimeout(timer)
   }, [currentStep, intake, getValues])
   
+  // Get steps based on company's wizard type (for early validation)
+  const wizardSteps = getStepsForWizardType(company?.wizardType)
+
   const handleNext = async () => {
-    const stepFields = getStepFields(currentStep)
+    const stepId = wizardSteps[currentStep]?.id
+    const stepFields = getStepFieldsById(stepId)
     const isValid = await trigger(stepFields)
-    
+
     if (isValid) {
-      setCurrentStep(prev => Math.min(prev + 1, STEPS.length - 1))
+      setCurrentStep(prev => Math.min(prev + 1, wizardSteps.length - 1))
       window.scrollTo(0, 0)
     }
   }
@@ -193,15 +251,18 @@ export default function CompanyIntake() {
     )
   }
   
-  const CurrentStepComponent = STEPS[currentStep].component
-  const isLastStep = currentStep === STEPS.length - 1
+  // Get steps based on company's wizard type
+  const steps = getStepsForWizardType(company?.wizardType)
+  const CurrentStepComponent = steps[currentStep].component
+  const isLastStep = currentStep === steps.length - 1
   
   // Dynamic branding based on company
   const brandColor = company?.primaryColor || '#2563eb'
   
   return (
-    <FormProvider {...methods}>
-      <div className="min-h-screen pb-24">
+    <RequiredFieldsProvider requiredFields={requiredFieldPaths}>
+      <FormProvider {...methods}>
+        <div className="min-h-screen pb-24">
         {/* Header with company branding */}
         <header 
           className="border-b border-gray-200 sticky top-0 z-10"
@@ -228,7 +289,7 @@ export default function CompanyIntake() {
                   {company?.name || 'Bail Bond Application'}
                 </h1>
                 <p className="text-sm text-gray-500">
-                  Step {currentStep + 1} of {STEPS.length}: {STEPS[currentStep].title}
+                  Step {currentStep + 1} of {steps.length}: {steps[currentStep].title}
                 </p>
               </div>
             </div>
@@ -236,10 +297,10 @@ export default function CompanyIntake() {
           
           {/* Progress bar */}
           <div className="h-2 bg-gray-200">
-            <div 
+            <div
               className="h-full transition-all duration-300"
-              style={{ 
-                width: `${((currentStep + 1) / STEPS.length) * 100}%`,
+              style={{
+                width: `${((currentStep + 1) / steps.length) * 100}%`,
                 backgroundColor: brandColor
               }}
             />
@@ -248,7 +309,7 @@ export default function CompanyIntake() {
         
         {/* Step indicators */}
         <div className="max-w-2xl mx-auto px-4 py-4">
-          <StepIndicator steps={STEPS} currentStep={currentStep} />
+          <StepIndicator steps={steps} currentStep={currentStep} />
         </div>
         
         {/* Error message */}
@@ -318,25 +379,27 @@ export default function CompanyIntake() {
           </div>
         )}
       </div>
-    </FormProvider>
+      </FormProvider>
+    </RequiredFieldsProvider>
   )
 }
 
-function getStepFields(stepIndex) {
-  switch (stepIndex) {
-    case 0:
-      return ['defendant.firstName', 'defendant.lastName', 'defendant.dob', 
+// Get fields to validate for each step by step ID
+function getStepFieldsById(stepId) {
+  switch (stepId) {
+    case 'basic':
+      return ['defendant.firstName', 'defendant.lastName', 'defendant.dob',
               'indemnitor.firstName', 'indemnitor.lastName', 'indemnitor.relationshipToDefendant']
-    case 1:
+    case 'defendant':
       return ['defendant']
-    case 2:
+    case 'indemnitor':
       return ['indemnitor']
-    case 3:
+    case 'references':
       return ['references']
-    case 4:
+    case 'review':
       return []
-    case 5:
-      return ['signatures.indemnitor']
+    case 'signatures':
+      return ['signatures']
     default:
       return []
   }

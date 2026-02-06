@@ -1,16 +1,19 @@
 /**
  * LinkCodeIntake - Unified intake form for both agent-initiated and client-initiated
  * URL: /:companySlug/:linkCode
- * 
+ *
  * For AGENT-initiated: Pre-fills defendant, co-signer, and bond info from agent's entry
  * For CLIENT-initiated: Loads any saved progress
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm, FormProvider } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import axios from 'axios'
 
 import StepIndicator from '../components/FormWizard/StepIndicator'
+import { buildDynamicSchema, getRequiredFieldPaths } from '../utils/validation'
+import { RequiredFieldsProvider } from '../contexts/RequiredFieldsContext'
 import StepBasicInfo from '../components/FormWizard/StepBasicInfo'
 import StepDefendant from '../components/FormWizard/StepDefendant'
 import StepIndemnitor from '../components/FormWizard/StepIndemnitor'
@@ -41,7 +44,7 @@ const AGENT_STEPS = [
 export default function LinkCodeIntake() {
   const { companySlug, linkCode } = useParams()
   const navigate = useNavigate()
-  
+
   const [currentStep, setCurrentStep] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -49,9 +52,22 @@ export default function LinkCodeIntake() {
   const [intake, setIntake] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   const [isAgentInitiated, setIsAgentInitiated] = useState(false)
-  
+
+  // Build dynamic schema based on company's requiredFields configuration
+  const dynamicSchema = useMemo(() => {
+    const requiredFields = getRequiredFieldPaths(company)
+    const wizardType = company?.wizardType?.toLowerCase() || 'medium'
+    return buildDynamicSchema(requiredFields, wizardType)
+  }, [company])
+
+  // Get required field paths for marking fields in UI
+  const requiredFieldPaths = useMemo(() => {
+    return new Set(getRequiredFieldPaths(company))
+  }, [company])
+
   const methods = useForm({
     mode: 'onChange',
+    resolver: zodResolver(dynamicSchema),
     defaultValues: {
       defendant: {},
       indemnitor: {},
@@ -61,15 +77,56 @@ export default function LinkCodeIntake() {
       finalAgreement: false,
     },
   })
-  
-  const { handleSubmit, reset, formState } = methods
+
+  const { handleSubmit, reset, formState, trigger, clearErrors } = methods
+
+  // Clear errors when schema changes (company loads) to re-evaluate with new schema
+  useEffect(() => {
+    if (company) {
+      clearErrors()
+    }
+  }, [company, clearErrors])
+
+  // Get field names to validate for each step
+  const getStepFields = (stepIndex, isAgent) => {
+    const steps = isAgent ? AGENT_STEPS : CLIENT_STEPS
+    const stepId = steps[stepIndex]?.id
+
+    switch (stepId) {
+      case 'basic':
+        return ['defendant.firstName', 'defendant.lastName', 'defendant.dob',
+                'indemnitor.firstName', 'indemnitor.lastName', 'indemnitor.relationshipToDefendant']
+      case 'defendant':
+        return ['defendant']
+      case 'indemnitor':
+        return ['indemnitor']
+      case 'references':
+        return ['references']
+      case 'review':
+        return []
+      case 'signatures':
+        return ['signatures']
+      default:
+        return []
+    }
+  }
+
+  const handleNext = async () => {
+    const stepFields = getStepFields(currentStep, isAgentInitiated)
+    const isValid = await trigger(stepFields)
+
+    if (isValid) {
+      setCurrentStep(currentStep + 1)
+      window.scrollTo(0, 0)
+    }
+  }
 
   useEffect(() => {
     const loadIntake = async () => {
       try {
         // Load company info
         const companyRes = await axios.get(`/api/company/${companySlug}`)
-        setCompany(companyRes.data)
+        setCompany(companyRes.data.company || companyRes.data)
         
         // Load intake data
         const intakeRes = await axios.get(`/api/intake/${linkCode}`)
@@ -335,55 +392,54 @@ export default function LinkCodeIntake() {
           onStepClick={setCurrentStep} 
         />
         
-        <FormProvider {...methods}>
-          <form onSubmit={handleSubmit(handleFinalSubmit)}>
-            <div className="bg-white rounded-xl border p-6 mb-6">
-              {StepComponent && <StepComponent />}
-            </div>
-            
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
-                {error}
+        <RequiredFieldsProvider requiredFields={requiredFieldPaths}>
+          <FormProvider {...methods}>
+            <form onSubmit={handleSubmit(handleFinalSubmit)}>
+              <div className="bg-white rounded-xl border p-6 mb-6">
+                {StepComponent && <StepComponent />}
               </div>
-            )}
-            
-            <div className="flex gap-4">
-              {currentStep > 0 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentStep(currentStep - 1)
-                    window.scrollTo(0, 0)
-                  }}
-                  className="flex-1 bg-white border border-gray-300 py-3 rounded-lg font-medium hover:bg-gray-50"
-                >
-                  Back
-                </button>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
+                  {error}
+                </div>
               )}
-              
-              {!isLastStep ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentStep(currentStep + 1)
-                    window.scrollTo(0, 0)
-                  }}
-                  className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700"
-                >
-                  Continue
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50"
-                >
-                  {submitting ? 'Submitting...' : 'Submit Application'}
-                </button>
-              )}
-            </div>
-          </form>
-        </FormProvider>
+
+              <div className="flex gap-4">
+                {currentStep > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentStep(currentStep - 1)
+                      window.scrollTo(0, 0)
+                    }}
+                    className="flex-1 bg-white border border-gray-300 py-3 rounded-lg font-medium hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                )}
+
+                {!isLastStep ? (
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700"
+                  >
+                    Continue
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {submitting ? 'Submitting...' : 'Submit Application'}
+                  </button>
+                )}
+              </div>
+            </form>
+          </FormProvider>
+        </RequiredFieldsProvider>
       </div>
     </div>
   )

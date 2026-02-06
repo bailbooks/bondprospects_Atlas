@@ -28,6 +28,7 @@ export default function AdminCompanyEdit() {
     logo: '',
     primaryColor: '#3b82f6',
     bailbooksCompanyId: '',
+    wizardType: 'medium',
     isActive: true
   })
   
@@ -61,6 +62,7 @@ export default function AdminCompanyEdit() {
         logo: data.logo || '',
         primaryColor: data.primaryColor || '#3b82f6',
         bailbooksCompanyId: data.bailbooksCompanyId || '',
+        wizardType: data.wizardType || 'medium',
         isActive: data.isActive
       })
       if (data.apiKeyMasked) {
@@ -418,7 +420,7 @@ export default function AdminCompanyEdit() {
           {/* Bailbooks Integration */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Bailbooks Integration</h2>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Bailbooks Company ID
@@ -433,6 +435,71 @@ export default function AdminCompanyEdit() {
               <p className="text-xs text-gray-500 mt-1">
                 The CompanyID from your Bailbooks database
               </p>
+            </div>
+          </div>
+
+          {/* Wizard Type Selection */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Form Wizard Type</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Choose which form wizard clients will see when filling out their application.
+            </p>
+
+            <div className="space-y-3">
+              <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${company.wizardType === 'basic' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                <input
+                  type="radio"
+                  name="wizardType"
+                  value="basic"
+                  checked={company.wizardType === 'basic'}
+                  onChange={(e) => setCompany({ ...company, wizardType: e.target.value })}
+                  className="mt-1 w-4 h-4 text-blue-600"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Basic Wizard</span>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Quick form with essential info only: defendant name, co-signer contact, and charges.
+                    Best for simple bonds or initial contact.
+                  </p>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${company.wizardType === 'medium' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                <input
+                  type="radio"
+                  name="wizardType"
+                  value="medium"
+                  checked={company.wizardType === 'medium'}
+                  onChange={(e) => setCompany({ ...company, wizardType: e.target.value })}
+                  className="mt-1 w-4 h-4 text-blue-600"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Medium Wizard</span>
+                  <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Recommended</span>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Standard form with defendant info, co-signer details, references, and signatures.
+                    Best balance of thoroughness and completion rate.
+                  </p>
+                </div>
+              </label>
+
+              <label className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${company.wizardType === 'full' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+                <input
+                  type="radio"
+                  name="wizardType"
+                  value="full"
+                  checked={company.wizardType === 'full'}
+                  onChange={(e) => setCompany({ ...company, wizardType: e.target.value })}
+                  className="mt-1 w-4 h-4 text-blue-600"
+                />
+                <div>
+                  <span className="font-medium text-gray-900">Full Wizard</span>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Comprehensive form with all details: personal info, features, employment,
+                    spouse info, emergency contacts, and more. Best for larger bonds or underwriting.
+                  </p>
+                </div>
+              </label>
             </div>
           </div>
           

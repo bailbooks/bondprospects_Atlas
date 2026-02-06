@@ -302,18 +302,20 @@ router.get('/companies/:id', authenticateAdmin, async (req, res, next) => {
  */
 router.post('/companies', authenticateAdmin, async (req, res, next) => {
   try {
-    const { 
-      slug, 
-      name, 
-      address, 
-      city, 
-      state, 
-      zip, 
-      phone, 
-      email, 
+    const {
+      slug,
+      name,
+      address,
+      city,
+      state,
+      zip,
+      phone,
+      email,
       logo,
       primaryColor,
-      bailbooksCompanyId
+      bailbooksCompanyId,
+      wizardType,
+      requiredFields
     } = req.body;
     
     if (!slug || !name) {
@@ -381,6 +383,8 @@ router.post('/companies', authenticateAdmin, async (req, res, next) => {
         logo,
         primaryColor,
         bailbooksCompanyId: bailbooksCompanyId ? parseInt(bailbooksCompanyId) : null,
+        wizardType: wizardType || 'medium',
+        requiredFields: requiredFields || null,
         isActive: true
       }
     });
@@ -402,18 +406,20 @@ router.post('/companies', authenticateAdmin, async (req, res, next) => {
 router.put('/companies/:id', authenticateAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { 
-      slug, 
-      name, 
-      address, 
-      city, 
-      state, 
-      zip, 
-      phone, 
-      email, 
+    const {
+      slug,
+      name,
+      address,
+      city,
+      state,
+      zip,
+      phone,
+      email,
       logo,
       primaryColor,
       bailbooksCompanyId,
+      wizardType,
+      requiredFields,
       isActive
     } = req.body;
     
@@ -474,6 +480,8 @@ router.put('/companies/:id', authenticateAdmin, async (req, res, next) => {
         logo,
         primaryColor,
         bailbooksCompanyId: bailbooksCompanyId ? parseInt(bailbooksCompanyId) : null,
+        wizardType,
+        requiredFields,
         isActive
       }
     });

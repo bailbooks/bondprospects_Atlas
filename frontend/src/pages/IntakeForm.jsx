@@ -35,6 +35,7 @@ export default function IntakeForm() {
   
   const methods = useForm({
     mode: 'onChange',
+    resolver: zodResolver(intakeSchema),
     defaultValues: {
       defendant: {
         firstName: '',

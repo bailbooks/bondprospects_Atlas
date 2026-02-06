@@ -90,7 +90,7 @@ export default function AgentWizard() {
     },
   })
   
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = methods
+  const { control, handleSubmit, watch, setValue, trigger, formState: { errors } } = methods
   const { fields: bondFields, append: appendBond, remove: removeBond } = useFieldArray({
     control,
     name: 'bonds',
@@ -179,9 +179,42 @@ export default function AgentWizard() {
     }
   }
   
-  const goNext = () => {
+  // Get fields to validate for each step
+  const getStepFields = (step) => {
+    switch (step) {
+      case 1: // Defendant / Co-Signer
+        return [
+          'defendant.firstName',
+          'defendant.lastName',
+          'defendant.dob',
+          'coSigner.firstName',
+          'coSigner.lastName',
+          'coSigner.cellPhone',
+        ]
+      case 2: // Bond(s) Info
+        return [
+          'bondDate',
+          'postingFacility',
+          'agentName',
+          'bonds',
+        ]
+      case 3: // Review
+        return []
+      case 4: // Send
+        return ['coSigner.cellPhone']
+      default:
+        return []
+    }
+  }
+
+  const goNext = async () => {
     if (currentStep < 4) {
-      setCurrentStep(currentStep + 1)
+      const fields = getStepFields(currentStep)
+      const isValid = await trigger(fields)
+
+      if (isValid) {
+        setCurrentStep(currentStep + 1)
+      }
     }
   }
   
@@ -326,18 +359,24 @@ export default function AgentWizard() {
                         First Name <span className="text-red-500">*</span>
                       </label>
                       <input
-                        {...methods.register('defendant.firstName', { required: true })}
-                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        {...methods.register('defendant.firstName', { required: 'First name is required' })}
+                        className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.defendant?.firstName ? 'border-red-500' : ''}`}
                       />
+                      {errors.defendant?.firstName && (
+                        <p className="text-red-500 text-xs mt-1">{errors.defendant.firstName.message}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Last Name <span className="text-red-500">*</span>
                       </label>
                       <input
-                        {...methods.register('defendant.lastName', { required: true })}
-                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        {...methods.register('defendant.lastName', { required: 'Last name is required' })}
+                        className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.defendant?.lastName ? 'border-red-500' : ''}`}
                       />
+                      {errors.defendant?.lastName && (
+                        <p className="text-red-500 text-xs mt-1">{errors.defendant.lastName.message}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -345,9 +384,12 @@ export default function AgentWizard() {
                       </label>
                       <input
                         type="date"
-                        {...methods.register('defendant.dob', { required: true })}
-                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        {...methods.register('defendant.dob', { required: 'Date of birth is required' })}
+                        className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.defendant?.dob ? 'border-red-500' : ''}`}
                       />
+                      {errors.defendant?.dob && (
+                        <p className="text-red-500 text-xs mt-1">{errors.defendant.dob.message}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -383,18 +425,24 @@ export default function AgentWizard() {
                         First Name <span className="text-red-500">*</span>
                       </label>
                       <input
-                        {...methods.register('coSigner.firstName', { required: true })}
-                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        {...methods.register('coSigner.firstName', { required: 'First name is required' })}
+                        className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.coSigner?.firstName ? 'border-red-500' : ''}`}
                       />
+                      {errors.coSigner?.firstName && (
+                        <p className="text-red-500 text-xs mt-1">{errors.coSigner.firstName.message}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Last Name <span className="text-red-500">*</span>
                       </label>
                       <input
-                        {...methods.register('coSigner.lastName', { required: true })}
-                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        {...methods.register('coSigner.lastName', { required: 'Last name is required' })}
+                        className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.coSigner?.lastName ? 'border-red-500' : ''}`}
                       />
+                      {errors.coSigner?.lastName && (
+                        <p className="text-red-500 text-xs mt-1">{errors.coSigner.lastName.message}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -415,19 +463,22 @@ export default function AgentWizard() {
                       <Controller
                         name="coSigner.cellPhone"
                         control={control}
-                        rules={{ 
-                          required: true,
+                        rules={{
+                          required: 'Cell phone is required',
                           validate: (value) => (value?.replace(/\D/g, '').length === 10) || 'Must be 10 digits'
                         }}
                         render={({ field }) => (
                           <PhoneInput
                             {...field}
                             placeholder="303-269-8547"
-                            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.coSigner?.cellPhone ? 'border-red-500' : ''}`}
                             required
                           />
                         )}
                       />
+                      {errors.coSigner?.cellPhone && (
+                        <p className="text-red-500 text-xs mt-1">{errors.coSigner.cellPhone.message}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -464,9 +515,12 @@ export default function AgentWizard() {
                           <input
                             type="text"
                             placeholder="$0.00"
-                            {...methods.register(`bonds.${index}.amount`, { required: true })}
-                            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            {...methods.register(`bonds.${index}.amount`, { required: 'Bond amount is required' })}
+                            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.bonds?.[index]?.amount ? 'border-red-500' : ''}`}
                           />
+                          {errors.bonds?.[index]?.amount && (
+                            <p className="text-red-500 text-xs mt-1">{errors.bonds[index].amount.message}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -475,9 +529,12 @@ export default function AgentWizard() {
                           <input
                             type="text"
                             placeholder="$0.00"
-                            {...methods.register(`bonds.${index}.premium`, { required: true })}
-                            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            {...methods.register(`bonds.${index}.premium`, { required: 'Bond premium is required' })}
+                            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.bonds?.[index]?.premium ? 'border-red-500' : ''}`}
                           />
+                          {errors.bonds?.[index]?.premium && (
+                            <p className="text-red-500 text-xs mt-1">{errors.bonds[index].premium.message}</p>
+                          )}
                         </div>
                         {index === 0 && (
                           <div>
@@ -486,9 +543,12 @@ export default function AgentWizard() {
                             </label>
                             <input
                               type="date"
-                              {...methods.register('bondDate', { required: true })}
-                              className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              {...methods.register('bondDate', { required: 'Bond date is required' })}
+                              className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.bondDate ? 'border-red-500' : ''}`}
                             />
+                            {errors.bondDate && (
+                              <p className="text-red-500 text-xs mt-1">{errors.bondDate.message}</p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -501,8 +561,8 @@ export default function AgentWizard() {
                             </label>
                             {facilities.length > 0 ? (
                               <select
-                                {...methods.register('postingFacility', { required: true })}
-                                className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                {...methods.register('postingFacility', { required: 'Posting facility is required' })}
+                                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.postingFacility ? 'border-red-500' : ''}`}
                               >
                                 <option value="">- Select -</option>
                                 {facilities.map(f => (
@@ -513,9 +573,12 @@ export default function AgentWizard() {
                               <input
                                 type="text"
                                 placeholder="Enter facility name"
-                                {...methods.register('postingFacility', { required: true })}
-                                className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                {...methods.register('postingFacility', { required: 'Posting facility is required' })}
+                                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.postingFacility ? 'border-red-500' : ''}`}
                               />
+                            )}
+                            {errors.postingFacility && (
+                              <p className="text-red-500 text-xs mt-1">{errors.postingFacility.message}</p>
                             )}
                           </div>
                         )}
@@ -525,8 +588,8 @@ export default function AgentWizard() {
                           </label>
                           {courts.length > 0 ? (
                             <select
-                              {...methods.register(`bonds.${index}.returnCourt`, { required: true })}
-                              className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              {...methods.register(`bonds.${index}.returnCourt`, { required: 'Return court is required' })}
+                              className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.bonds?.[index]?.returnCourt ? 'border-red-500' : ''}`}
                             >
                               <option value="">- Select -</option>
                               {courts.map(c => (
@@ -537,9 +600,12 @@ export default function AgentWizard() {
                             <input
                               type="text"
                               placeholder="Enter court name"
-                              {...methods.register(`bonds.${index}.returnCourt`, { required: true })}
-                              className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              {...methods.register(`bonds.${index}.returnCourt`, { required: 'Return court is required' })}
+                              className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.bonds?.[index]?.returnCourt ? 'border-red-500' : ''}`}
                             />
+                          )}
+                          {errors.bonds?.[index]?.returnCourt && (
+                            <p className="text-red-500 text-xs mt-1">{errors.bonds[index].returnCourt.message}</p>
                           )}
                         </div>
                       </div>
@@ -562,8 +628,8 @@ export default function AgentWizard() {
                             </label>
                             {agents.length > 0 ? (
                               <select
-                                {...methods.register('agentName', { required: true })}
-                                className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                {...methods.register('agentName', { required: 'Agent is required' })}
+                                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.agentName ? 'border-red-500' : ''}`}
                               >
                                 <option value="">- Select -</option>
                                 {agents.map(a => (
@@ -574,14 +640,17 @@ export default function AgentWizard() {
                               <input
                                 type="text"
                                 placeholder="Enter agent name"
-                                {...methods.register('agentName', { required: true })}
-                                className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                {...methods.register('agentName', { required: 'Agent is required' })}
+                                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.agentName ? 'border-red-500' : ''}`}
                               />
+                            )}
+                            {errors.agentName && (
+                              <p className="text-red-500 text-xs mt-1">{errors.agentName.message}</p>
                             )}
                           </div>
                         )}
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Charges <span className="text-red-500">*</span>
@@ -589,9 +658,12 @@ export default function AgentWizard() {
                         <input
                           type="text"
                           placeholder="Start typing"
-                          {...methods.register(`bonds.${index}.charges`, { required: true })}
-                          className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          {...methods.register(`bonds.${index}.charges`, { required: 'Charges is required' })}
+                          className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.bonds?.[index]?.charges ? 'border-red-500' : ''}`}
                         />
+                        {errors.bonds?.[index]?.charges && (
+                          <p className="text-red-500 text-xs mt-1">{errors.bonds[index].charges.message}</p>
+                        )}
                       </div>
                       
                       {index < bondFields.length - 1 && (
